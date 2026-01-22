@@ -19,6 +19,8 @@ Kubera is a coupon system designed to handle high-traffic flash sales while ensu
 | Language | Go 1.24 |
 | Framework | Gin |
 | Database | PostgreSQL 16 |
+| Database Driver | pgx/v5 (pgxpool) |
+| Migration Tool | Goose |
 | SQL Generation | SQLC |
 | Deployment | Docker / Docker Compose |
 | Config | Viper |
@@ -53,6 +55,7 @@ kubera/
 │   │   ├── repository/
 │   │   ├── service/
 │   │   ├── handler/
+│   │   ├── errors/
 │   │   └── module.go
 │   │
 │   ├── claim/                       # Claim domain
@@ -60,27 +63,27 @@ kubera/
 │   │   ├── repository/
 │   │   ├── service/
 │   │   ├── handler/
+│   │   ├── errors/
 │   │   └── module.go
 │   │
-│   ├── middlewares/                 # HTTP middlewares
+│   ├── middlewares/                 # HTTP middlewares (CORS, Logger, Recovery)
 │   └── pkg/                         # Shared packages
 │       ├── config/                  # Viper configuration
 │       ├── error/                   # Error types
-│       ├── jwt/                     # JWT utilities
+│       ├── response/                # HTTP response utilities
 │       └── sql/                     # SQLC generated code
 │
 ├── db/
-│   ├── migrations/                  # Database migrations
-│   ├── queries/                     # SQLC query files
-│   └── seeds/                       # Seed data
+│   ├── migrations/                  # Database migrations (Goose)
+│   └── queries/                     # SQLC query files
 │
 ├── tests/
-│   ├── stress/                      # Stress tests
-│   └── integration/                 # Integration tests
+│   └── stress/                      # Stress tests
 │
 ├── Dockerfile
 ├── docker-compose.yaml
 ├── Makefile
+├── sqlc.yaml
 ├── .env.example
 └── README.md
 ```
@@ -88,7 +91,8 @@ kubera/
 ## Prerequisites
 
 - **Docker Desktop** (or Docker + Docker Compose)
-- **Go 1.23+** (for local development)
+- **Go 1.24+** (for local development)
+- **Goose** (for database migrations)
 - **Make** (optional, for using Makefile commands)
 
 ## Quick Start
@@ -108,12 +112,14 @@ make docker-up
 docker-compose up -d
 ```
 
+The PostgreSQL database will be available at `localhost:5433` (mapped from container port 5432).
+
 ### 3. Run Database Migrations
 
 ```bash
 make migrate
 # or
-psql postgresql://postgres:postgres@localhost:5432/kubera -f db/migrations/20240101000001_initial.sql
+goose -dir db/migrations postgres "postgres://postgres:postgres@localhost:5433/kubera?sslmode=disable" up
 ```
 
 ### 4. Start the Application
@@ -261,16 +267,25 @@ The stress tests verify two critical scenarios:
 ## Makefile Commands
 
 ```bash
-make help          # Show all available commands
-make run           # Run the application
-make build         # Build the application
-make test          # Run all tests
-make test-stress   # Run stress tests
-make docker-up     # Start Docker services
-make docker-down   # Stop Docker services
-make migrate       # Run database migrations
-make migrate-down  # Rollback migrations
-make clean         # Clean build artifacts
+make help               # Show all available commands
+make run                # Run the application
+make build              # Build the application
+make test               # Run all tests (auto-runs migrations)
+make test-stress        # Run stress tests (auto-runs migrations)
+make test-integration   # Run integration tests (auto-runs migrations)
+make clean              # Clean build artifacts
+make docker-up          # Start Docker services
+make docker-down        # Stop Docker services
+make docker-logs        # Show Docker logs
+make migrate            # Run database migrations
+make migrate-down       # Rollback the last migration
+make migrate-down-all   # Rollback all migrations
+make migrate-status     # Show migration status
+make migrate-create     # Create a new migration (usage: make migrate-create name=migration_name)
+make sqlc-generate      # Generate SQLC code
+make deps               # Download dependencies
+make lint               # Run linter
+make fmt                # Format code
 ```
 
 ## Development Notes
@@ -287,6 +302,8 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 # Regenerate code
 sqlc generate
+# or
+make sqlc-generate
 ```
 
 **Query files are located in:**
@@ -294,6 +311,18 @@ sqlc generate
 - `db/queries/claim.sql` - Claim-related queries
 
 **Configuration:** `sqlc.yaml` in the project root
+
+### Goose (Database Migrations)
+
+This project uses **Goose** for database migrations.
+
+**To install Goose:**
+
+```bash
+go install github.com/pressly/goose/v3/cmd/goose@latest
+```
+
+**Migration files are located in:** `db/migrations/`
 
 ## Database Design
 
@@ -385,11 +414,20 @@ cp .env.example .env
 |----------|-------------|---------|
 | `SERVER_PORT` | HTTP server port | `8080` |
 | `SERVER_MODE` | Gin mode (debug/release) | `debug` |
+| `SERVER_READ_TIMEOUT` | Read timeout in seconds | `60` |
+| `SERVER_WRITE_TIMEOUT` | Write timeout in seconds | `60` |
 | `DATABASE_HOST` | PostgreSQL host | `localhost` |
 | `DATABASE_PORT` | PostgreSQL port | `5432` |
 | `DATABASE_USER` | PostgreSQL user | `postgres` |
 | `DATABASE_PASSWORD` | PostgreSQL password | `postgres` |
 | `DATABASE_DBNAME` | Database name | `kubera` |
+| `DATABASE_SSLMODE` | SSL mode | `disable` |
+| `DATABASE_MAX_OPEN_CONNS` | Max open connections | `25` |
+| `DATABASE_MAX_IDLE_CONNS` | Max idle connections | `5` |
+| `JWT_SECRET` | JWT secret key | `your-secret-key-change-this-in-production` |
+| `JWT_EXPIRATION` | JWT expiration in hours | `24` |
+
+**Note:** When using Docker Compose, the database is accessible on port `5433` on the host machine (mapped from container port `5432`). Adjust your `DATABASE_HOST` accordingly.
 
 ## License
 
@@ -439,11 +477,10 @@ The system implements atomic transactions to ensure data consistency under concu
   - No overselling occurred
 - **Verification**: Transaction isolation prevents race conditions
 
-#### ⏳ Flash Sale Attack Test
+#### ✅ Flash Sale Attack Test
 - **Scenario**: 50 concurrent requests for a coupon with only 5 items in stock
 - **Status**: Implemented and verified
 - **Expected Behavior**: Exactly 5 claims, 0 remaining
-- **Note**: PostgreSQL serializes concurrent transactions for same row, which is expected behavior
 - **Verification**: Transactions enforce atomicity and prevent overselling
 
 ### Architecture Notes
@@ -451,7 +488,7 @@ The system implements atomic transactions to ensure data consistency under concu
 **Concurrency Strategy:**
 - **Pessimistic Locking**: Uses `SELECT ... FOR UPDATE` to lock rows during transactions
 - **Serializable Isolation**: PostgreSQL ensures transaction isolation prevents anomalies
-- **Connection Pooling**: Configured for high-concurrency scenarios (25 max connections)
+- **Connection Pooling**: Configured for high-concurrency scenarios (25 max connections, 5 min idle)
 
 **Database Constraints:**
 - **Unique Index**: `CONSTRAINT unique_user_coupon UNIQUE (user_id, coupon_name)`
@@ -463,10 +500,13 @@ The system implements atomic transactions to ensure data consistency under concu
 - Repository Pattern: Database access abstraction with transaction support
 - Service Layer: Business logic with transaction orchestration
 - Handler Layer: HTTP request handling with proper error codes
+- Response Package: Centralized HTTP response handling and error formatting
 
-The implementation satisfies all requirements from Task.MD:
+The implementation satisfies all requirements for a high-concurrency flash sale system:
 - ✅ High-concurrency support with atomic transactions
 - ✅ Strict data consistency via database-level constraints
 - ✅ No race conditions via row-level locking
-- ✅ Docker deployment ready
+- ✅ Docker deployment ready with health checks
 - ✅ Automated stress testing verification
+- ✅ Graceful shutdown support
+- ✅ Comprehensive error handling
