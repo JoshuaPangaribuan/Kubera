@@ -13,29 +13,21 @@ import (
 	sqlc "github.com/joshuarp/kubera/internal/pkg/sql"
 )
 
-// Repository defines coupon repository interface
-type Repository interface {
-	Create(ctx context.Context, coupon *entity.Coupon) error
-	GetByName(ctx context.Context, name string) (*entity.Coupon, error)
-	GetForUpdate(ctx context.Context, name string, tx ...pgx.Tx) (*entity.Coupon, error)
-	UpdateRemainingAmount(ctx context.Context, name string, amount int, tx ...pgx.Tx) error
-	List(ctx context.Context) ([]*entity.Coupon, error)
-}
-
-type repository struct {
+// Repository handles coupon data persistence
+type Repository struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 // New creates a new coupon repository
-func New(pool *pgxpool.Pool, queries *sqlc.Queries) Repository {
-	return &repository{
+func New(pool *pgxpool.Pool, queries *sqlc.Queries) *Repository {
+	return &Repository{
 		pool:    pool,
 		queries: queries,
 	}
 }
 
-func (r *repository) Create(ctx context.Context, coupon *entity.Coupon) error {
+func (r *Repository) Create(ctx context.Context, coupon *entity.Coupon) error {
 	params := sqlc.CreateCouponParams{
 		Name:   coupon.Name,
 		Amount: int32(coupon.Amount),
@@ -55,7 +47,7 @@ func (r *repository) Create(ctx context.Context, coupon *entity.Coupon) error {
 	return nil
 }
 
-func (r *repository) GetByName(ctx context.Context, name string) (*entity.Coupon, error) {
+func (r *Repository) GetByName(ctx context.Context, name string) (*entity.Coupon, error) {
 	dbCoupon, err := r.queries.GetCouponByName(ctx, name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -67,7 +59,7 @@ func (r *repository) GetByName(ctx context.Context, name string) (*entity.Coupon
 	return dbCouponToEntity(&dbCoupon), nil
 }
 
-func (r *repository) GetForUpdate(ctx context.Context, name string, tx ...pgx.Tx) (*entity.Coupon, error) {
+func (r *Repository) GetForUpdate(ctx context.Context, name string, tx ...pgx.Tx) (*entity.Coupon, error) {
 	var dbCoupon sqlc.Coupon
 	var err error
 
@@ -89,7 +81,7 @@ func (r *repository) GetForUpdate(ctx context.Context, name string, tx ...pgx.Tx
 	return dbCouponToEntity(&dbCoupon), nil
 }
 
-func (r *repository) UpdateRemainingAmount(ctx context.Context, name string, amount int, tx ...pgx.Tx) error {
+func (r *Repository) UpdateRemainingAmount(ctx context.Context, name string, amount int, tx ...pgx.Tx) error {
 	params := sqlc.UpdateRemainingAmountParams{
 		RemainingAmount: int32(amount),
 		Name:            name,
@@ -112,7 +104,7 @@ func (r *repository) UpdateRemainingAmount(ctx context.Context, name string, amo
 	return nil
 }
 
-func (r *repository) List(ctx context.Context) ([]*entity.Coupon, error) {
+func (r *Repository) List(ctx context.Context) ([]*entity.Coupon, error) {
 	dbCoupons, err := r.queries.ListAllCoupons(ctx)
 	if err != nil {
 		return nil, apperrors.InternalServer("failed to list coupons", err)

@@ -7,26 +7,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joshuarp/kubera/internal/claim/entity"
 	claimerrors "github.com/joshuarp/kubera/internal/claim/errors"
-	"github.com/joshuarp/kubera/internal/claim/repository"
+	claimrepository "github.com/joshuarp/kubera/internal/claim/repository"
 	couponentity "github.com/joshuarp/kubera/internal/coupon/entity"
-	couponrepo "github.com/joshuarp/kubera/internal/coupon/repository"
+	couponrepository "github.com/joshuarp/kubera/internal/coupon/repository"
 )
 
-// Service defines claim service interface
-type Service interface {
-	ClaimCoupon(ctx context.Context, req *entity.ClaimCouponRequest) (*couponentity.CouponResponse, error)
-	GetClaimedByCoupon(ctx context.Context, couponName string) ([]string, error)
-}
-
-type service struct {
-	claimRepo  repository.Repository
-	couponRepo couponrepo.Repository
+// Service handles claim business logic
+type Service struct {
+	claimRepo  *claimrepository.Repository
+	couponRepo *couponrepository.Repository
 	pool       *pgxpool.Pool
 }
 
 // New creates a new claim service
-func New(claimRepo repository.Repository, couponRepo couponrepo.Repository, pool *pgxpool.Pool) Service {
-	return &service{
+func New(claimRepo *claimrepository.Repository, couponRepo *couponrepository.Repository, pool *pgxpool.Pool) *Service {
+	return &Service{
 		claimRepo:  claimRepo,
 		couponRepo: couponRepo,
 		pool:       pool,
@@ -41,7 +36,7 @@ func New(claimRepo repository.Repository, couponRepo couponrepo.Repository, pool
 // 4. Insert claim record
 // 5. Decrement remaining amount
 // All within a database transaction
-func (s *service) ClaimCoupon(ctx context.Context, req *entity.ClaimCouponRequest) (*couponentity.CouponResponse, error) {
+func (s *Service) ClaimCoupon(ctx context.Context, req *entity.ClaimCouponRequest) (*couponentity.CouponResponse, error) {
 	// Start database transaction
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -113,6 +108,6 @@ func (s *service) ClaimCoupon(ctx context.Context, req *entity.ClaimCouponReques
 	return result, nil
 }
 
-func (s *service) GetClaimedByCoupon(ctx context.Context, couponName string) ([]string, error) {
+func (s *Service) GetClaimedByCoupon(ctx context.Context, couponName string) ([]string, error) {
 	return s.claimRepo.ListClaimedByCoupon(ctx, couponName)
 }

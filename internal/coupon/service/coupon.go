@@ -4,28 +4,22 @@ import (
 	"context"
 
 	"github.com/joshuarp/kubera/internal/coupon/entity"
-	"github.com/joshuarp/kubera/internal/coupon/repository"
+	couponrepository "github.com/joshuarp/kubera/internal/coupon/repository"
 )
 
-// Service defines the coupon service interface
-type Service interface {
-	CreateCoupon(ctx context.Context, req *entity.CreateCouponRequest) (*entity.Coupon, error)
-	GetCoupon(ctx context.Context, name string) (*entity.Coupon, error)
-	ListCoupons(ctx context.Context) ([]*entity.Coupon, error)
-}
-
-type service struct {
-	repo repository.Repository
+// Service handles coupon business logic
+type Service struct {
+	repo *couponrepository.Repository
 }
 
 // New creates a new coupon service
-func New(repo repository.Repository) Service {
-	return &service{
+func New(repo *couponrepository.Repository) *Service {
+	return &Service{
 		repo: repo,
 	}
 }
 
-func (s *service) CreateCoupon(ctx context.Context, req *entity.CreateCouponRequest) (*entity.Coupon, error) {
+func (s *Service) CreateCoupon(ctx context.Context, req *entity.CreateCouponRequest) (*entity.Coupon, error) {
 	// Create coupon entity
 	coupon := &entity.Coupon{
 		Name:            req.Name,
@@ -41,10 +35,10 @@ func (s *service) CreateCoupon(ctx context.Context, req *entity.CreateCouponRequ
 	return coupon, nil
 }
 
-func (s *service) GetCoupon(ctx context.Context, name string) (*entity.Coupon, error) {
+func (s *Service) GetCoupon(ctx context.Context, name string) (*entity.Coupon, error) {
 	return s.repo.GetByName(ctx, name)
 }
 
-func (s *service) ListCoupons(ctx context.Context) ([]*entity.Coupon, error) {
+func (s *Service) ListCoupons(ctx context.Context) ([]*entity.Coupon, error) {
 	return s.repo.List(ctx)
 }

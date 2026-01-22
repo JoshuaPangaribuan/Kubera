@@ -12,8 +12,8 @@ import (
 // Module represents the coupon domain module with all its dependencies
 type Module struct {
 	Handler *handler.Handler
-	Service service.Service
-	Repo    repository.Repository
+	Service *service.Service
+	Repo    *repository.Repository
 	Queries *sqlc.Queries
 }
 
@@ -42,6 +42,6 @@ func NewModule(pool *pgxpool.Pool) *Module {
 // SetClaimService sets the claim service on the handler after initialization
 // This is needed because the claim module depends on the coupon repository,
 // creating a circular dependency if we try to inject the claim service during initialization
-func (m *Module) SetClaimService(claimSvc claimservice.Service) {
+func (m *Module) SetClaimService(claimSvc *claimservice.Service) {
 	m.Handler = handler.New(m.Service, claimSvc)
 }

@@ -5,21 +5,21 @@ import (
 	"github.com/joshuarp/kubera/internal/claim/handler"
 	"github.com/joshuarp/kubera/internal/claim/repository"
 	"github.com/joshuarp/kubera/internal/claim/service"
-	couponrepo "github.com/joshuarp/kubera/internal/coupon/repository"
+	couponrepository "github.com/joshuarp/kubera/internal/coupon/repository"
 	sqlc "github.com/joshuarp/kubera/internal/pkg/sql"
 )
 
 // Module represents the claim domain module with all its dependencies
 type Module struct {
 	Handler *handler.Handler
-	Service service.Service
-	Repo    repository.Repository
+	Service *service.Service
+	Repo    *repository.Repository
 	Queries *sqlc.Queries
 	Pool    *pgxpool.Pool
 }
 
 // NewModule initializes the claim domain module with all dependencies
-func NewModule(pool *pgxpool.Pool, queries *sqlc.Queries, couponRepo couponrepo.Repository) *Module {
+func NewModule(pool *pgxpool.Pool, queries *sqlc.Queries, couponRepo *couponrepository.Repository) *Module {
 	// Initialize claim repository
 	claimRepo := repository.New(pool, queries)
 

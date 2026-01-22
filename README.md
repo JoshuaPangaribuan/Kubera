@@ -16,9 +16,10 @@ Kubera is a coupon system designed to handle high-traffic flash sales while ensu
 
 | Component | Technology |
 |-----------|------------|
-| Language | Go 1.23 |
+| Language | Go 1.24 |
 | Framework | Gin |
 | Database | PostgreSQL 16 |
+| SQL Generation | SQLC |
 | Deployment | Docker / Docker Compose |
 | Config | Viper |
 
@@ -271,6 +272,28 @@ make migrate       # Run database migrations
 make migrate-down  # Rollback migrations
 make clean         # Clean build artifacts
 ```
+
+## Development Notes
+
+### SQLC (SQL Code Generation)
+
+This project uses **SQLC** to generate type-safe database code from SQL queries. The generated code is located in `internal/pkg/sql/`.
+
+**To regenerate SQLC code after modifying query files:**
+
+```bash
+# Install SQLC (if not already installed)
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+# Regenerate code
+sqlc generate
+```
+
+**Query files are located in:**
+- `db/queries/coupon.sql` - Coupon-related queries
+- `db/queries/claim.sql` - Claim-related queries
+
+**Configuration:** `sqlc.yaml` in the project root
 
 ## Database Design
 

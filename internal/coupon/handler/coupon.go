@@ -7,18 +7,18 @@ import (
 	claimerrors "github.com/joshuarp/kubera/internal/claim/errors"
 	claimservice "github.com/joshuarp/kubera/internal/claim/service"
 	"github.com/joshuarp/kubera/internal/coupon/entity"
-	"github.com/joshuarp/kubera/internal/coupon/service"
-	apperrors "github.com/joshuarp/kubera/internal/pkg/error"
+	couponservice "github.com/joshuarp/kubera/internal/coupon/service"
+	appresponse "github.com/joshuarp/kubera/internal/pkg/response"
 )
 
 // Handler handles coupon-related HTTP requests
 type Handler struct {
-	service      service.Service
-	claimService claimservice.Service
+	service      *couponservice.Service
+	claimService *claimservice.Service
 }
 
 // New creates a new coupon handler
-func New(service service.Service, claimService claimservice.Service) *Handler {
+func New(service *couponservice.Service, claimService *claimservice.Service) *Handler {
 	return &Handler{
 		service:      service,
 		claimService: claimService,
@@ -29,18 +29,12 @@ func New(service service.Service, claimService claimservice.Service) *Handler {
 func (h *Handler) CreateCoupon(c *gin.Context) {
 	var req entity.CreateCouponRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": claimerrors.ErrInvalidPayload.Message})
+		appresponse.HandleValidationError(c, err, claimerrors.ErrInvalidPayload.Message)
 		return
 	}
 
 	coupon, err := h.service.CreateCoupon(c.Request.Context(), &req)
-	if err != nil {
-		switch e := err.(type) {
-		case *apperrors.AppError:
-			c.JSON(e.Code, gin.H{"error": e.Message})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		}
+	if appresponse.HandleError(c, err) {
 		return
 	}
 
@@ -52,13 +46,7 @@ func (h *Handler) GetCoupon(c *gin.Context) {
 	name := c.Param("name")
 
 	coupon, err := h.service.GetCoupon(c.Request.Context(), name)
-	if err != nil {
-		switch e := err.(type) {
-		case *apperrors.AppError:
-			c.JSON(e.Code, gin.H{"error": e.Message})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		}
+	if appresponse.HandleError(c, err) {
 		return
 	}
 

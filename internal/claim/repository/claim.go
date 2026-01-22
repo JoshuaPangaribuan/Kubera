@@ -13,28 +13,21 @@ import (
 	sqlc "github.com/joshuarp/kubera/internal/pkg/sql"
 )
 
-// Repository defines claim repository interface
-type Repository interface {
-	Create(ctx context.Context, claim *entity.Claim, tx ...pgx.Tx) error
-	GetByUserAndCoupon(ctx context.Context, userID, couponName string) (*entity.Claim, error)
-	ListClaimedByCoupon(ctx context.Context, couponName string) ([]string, error)
-	ExistsByUserAndCoupon(ctx context.Context, userID, couponName string) (bool, error)
-}
-
-type repository struct {
+// Repository handles claim data persistence
+type Repository struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 // New creates a new claim repository
-func New(pool *pgxpool.Pool, queries *sqlc.Queries) Repository {
-	return &repository{
+func New(pool *pgxpool.Pool, queries *sqlc.Queries) *Repository {
+	return &Repository{
 		pool:    pool,
 		queries: queries,
 	}
 }
 
-func (r *repository) Create(ctx context.Context, claim *entity.Claim, tx ...pgx.Tx) error {
+func (r *Repository) Create(ctx context.Context, claim *entity.Claim, tx ...pgx.Tx) error {
 	params := sqlc.CreateClaimParams{
 		UserID:     claim.UserID,
 		CouponName: claim.CouponName,
@@ -61,7 +54,7 @@ func (r *repository) Create(ctx context.Context, claim *entity.Claim, tx ...pgx.
 	return nil
 }
 
-func (r *repository) GetByUserAndCoupon(ctx context.Context, userID, couponName string) (*entity.Claim, error) {
+func (r *Repository) GetByUserAndCoupon(ctx context.Context, userID, couponName string) (*entity.Claim, error) {
 	params := sqlc.GetClaimByUserAndCouponParams{
 		UserID:     userID,
 		CouponName: couponName,
@@ -77,7 +70,7 @@ func (r *repository) GetByUserAndCoupon(ctx context.Context, userID, couponName 
 	return dbClaimToEntity(&dbClaim), nil
 }
 
-func (r *repository) ListClaimedByCoupon(ctx context.Context, couponName string) ([]string, error) {
+func (r *Repository) ListClaimedByCoupon(ctx context.Context, couponName string) ([]string, error) {
 	userIDs, err := r.queries.ListClaimedByCoupon(ctx, couponName)
 	if err != nil {
 		return nil, apperrors.InternalServer("failed to list claimed by", err)
@@ -86,7 +79,7 @@ func (r *repository) ListClaimedByCoupon(ctx context.Context, couponName string)
 	return userIDs, nil
 }
 
-func (r *repository) ExistsByUserAndCoupon(ctx context.Context, userID, couponName string) (bool, error) {
+func (r *Repository) ExistsByUserAndCoupon(ctx context.Context, userID, couponName string) (bool, error) {
 	claim, err := r.GetByUserAndCoupon(ctx, userID, couponName)
 	if err != nil {
 		return false, err

@@ -28,15 +28,15 @@ build: ## Build the application
 	@mkdir -p $(BUILD_DIR)
 	go build -o $(BUILD_DIR)/$(APP_NAME) $(CMD_DIR)/main.go
 
-test: ## Run all tests
+test: migrate ## Run all tests (auto-runs migrations first)
 	@echo "Running tests..."
 	go test -v ./...
 
-test-stress: ## Run stress tests
+test-stress: migrate ## Run stress tests (auto-runs migrations first)
 	@echo "Running stress tests..."
 	go test -v ./tests/stress/...
 
-test-integration: ## Run integration tests
+test-integration: migrate ## Run integration tests (auto-runs migrations first)
 	@echo "Running integration tests..."
 	go test -v ./tests/integration/...
 

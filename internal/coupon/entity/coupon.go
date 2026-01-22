@@ -25,9 +25,3 @@ type CreateCouponRequest struct {
 	Name   string `json:"name" binding:"required"`
 	Amount int    `json:"amount" binding:"required,gt=0"`
 }
-
-// ToEntity converts from a database model to domain entity
-func ToEntity(dbCoupon interface{}) *Coupon {
-	// This will be implemented with actual SQLC types
-	return &Coupon{}
-}

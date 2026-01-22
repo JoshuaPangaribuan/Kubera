@@ -6,17 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joshuarp/kubera/internal/claim/entity"
 	claimerrors "github.com/joshuarp/kubera/internal/claim/errors"
-	"github.com/joshuarp/kubera/internal/claim/service"
-	apperrors "github.com/joshuarp/kubera/internal/pkg/error"
+	claimservice "github.com/joshuarp/kubera/internal/claim/service"
+	appresponse "github.com/joshuarp/kubera/internal/pkg/response"
 )
 
 // Handler handles claim-related HTTP requests
 type Handler struct {
-	service service.Service
+	service *claimservice.Service
 }
 
 // New creates a new claim handler
-func New(service service.Service) *Handler {
+func New(service *claimservice.Service) *Handler {
 	return &Handler{
 		service: service,
 	}
@@ -26,18 +26,12 @@ func New(service service.Service) *Handler {
 func (h *Handler) ClaimCoupon(c *gin.Context) {
 	var req entity.ClaimCouponRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": claimerrors.ErrInvalidPayload.Message})
+		appresponse.HandleValidationError(c, err, claimerrors.ErrInvalidPayload.Message)
 		return
 	}
 
 	result, err := h.service.ClaimCoupon(c.Request.Context(), &req)
-	if err != nil {
-		switch e := err.(type) {
-		case *apperrors.AppError:
-			c.JSON(e.Code, gin.H{"error": e.Message})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		}
+	if appresponse.HandleError(c, err) {
 		return
 	}
 
